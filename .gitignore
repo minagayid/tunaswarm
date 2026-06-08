@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# OS / editors
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Config with secrets (copy example instead)
+config/platform_credentials.json
+
+# Node (if any tooling needs it)
+node_modules/
+
+# Coverage / logs
+.coverage
+htmlcov/
+*.log
+
+# Hermes sandbox
+sandboxes/

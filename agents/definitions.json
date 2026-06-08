@@ -1,0 +1,215 @@
+{
+  "version": "1.0.0",
+  "swarm_name": "Freelance Operations AI Swarm",
+  "summary": "Specialized AI agents that find, win, deliver, and monetize freelance projects while managing token costs and profit allocation.",
+  "agents": [
+    {
+      "id": "lead-finder",
+      "name": "Lead Finder",
+      "purpose": "Scan freelance platforms for opportunities matching owner skills",
+      "responsibilities": [
+        "Search Upwork, Fiverr, Toptal for matching projects",
+        "Score fit (budget, complexity, competition, timeline)",
+        "Shortlist top N with proposed bid strategy",
+        "Avoid over-bidding on low-value or saturated markets"
+      ],
+      "inputs": ["owner_profile.json", "platform_credentials.json", "search_queries.json"],
+      "outputs": ["leads_shortlist.json"],
+      "token_budget_per_run": 2000,
+      "max_consecutive_runs": 10
+    },
+    {
+      "id": "profile-optimizer",
+      "name": "Profile Optimizer",
+      "purpose": "Craft winning platform profiles, proposals, and portfolios",
+      "responsibilities": [
+        "Generate/optimize Upwork and Fiverr profiles",
+        "Draft proposals tailored to each opportunity",
+        "Create portfolio pieces and case studies from past work"
+      ],
+      "inputs": ["owner_profile.json", "leads_shortlist.json"],
+      "outputs": ["proposals.json", "profile_variants.md"],
+      "token_budget_per_run": 3000,
+      "max_consecutive_runs": 8
+    },
+    {
+      "id": "project-manager",
+      "name": "Project Manager",
+      "purpose": "Turn won projects into deliverable plans and track execution",
+      "responsibilities": [
+        "Break requirements into milestones and tasks",
+        "Assign tasks to Specialist Agents using workflow",
+        "Track milestone status and blockers",
+        "Trigger billing and handoff steps when complete"
+      ],
+      "inputs": ["won_projects.json", "proposals.json"],
+      "outputs": ["project_plan.json", "milestones.json"],
+      "token_budget_per_run": 2500,
+      "max_consecutive_runs": 15
+    },
+    {
+      "id": "code-agent",
+      "name": "Code Specialist",
+      "purpose": "Implement solutions across common web and data stacks",
+      "responsibilities": [
+        "Build and iterate on project milestones",
+        "Follow project style rules and test requirements",
+        "Produce runnable artifacts (apps, scripts, integrations)"
+      ],
+      "inputs": ["project_plan.json", "milestone_n.json"],
+      "outputs": ["deliverables_n.zip", "tests_results.json"],
+      "token_budget_per_run": 8000,
+      "max_consecutive_runs": 20
+    },
+    {
+      "id": "qa-agent",
+      "name": "QA Reviewer",
+      "purpose": "Validate deliverables before client delivery",
+      "responsibilities": [
+        "Run tests and review code quality",
+        "Verify requirements coverage and acceptance criteria",
+        "Approve for delivery or request changes"
+      ],
+      "inputs": ["deliverables_n.zip", "milestone_n_requirements.json"],
+      "outputs": ["qa_report_n.json"],
+      "approved_for_delivery_type": "boolean",
+      "token_budget_per_run": 3000,
+      "max_consecutive_runs": 15
+    },
+    {
+      "id": "billing-agent",
+      "name": "Billing Agent",
+      "purpose": "Generate invoices, send payment requests, and record financials",
+      "responsibilities": [
+        "Create invoice on delivery approval",
+        "Send payment link or reminder via platform/email",
+        "Record invoice status and expected payment date"
+      ],
+      "inputs": ["approved_deliverables.json", "client_info.json"],
+      "outputs": ["invoices.json"],
+      "token_budget_per_run": 1500,
+      "max_consecutive_runs": 12
+    },
+    {
+      "id": "collector-agent",
+      "name": "Payment Collector",
+      "purpose": "Track payments and chase outstanding invoices",
+      "responsibilities": [
+        "Poll payment status on platforms and links",
+        "Send reminders and escalation notes",
+        "Log payment and mark project complete"
+      ],
+      "inputs": ["invoices.json"],
+      "outputs": ["payments.json", "cashflow_events.json"],
+      "token_budget_per_run": 1200,
+      "max_consecutive_runs": 10
+    },
+    {
+      "id": "economics-agent",
+      "name": "Economics & Token CFO",
+      "purpose": "Track total token spend per project and overall P&L",
+      "responsibilities": [
+        "Accumulate token usage across agents and projects",
+        "Compute cost vs revenue per project",
+        "Flag negative-margin work and recommend pricing changes"
+      ],
+      "inputs": ["token_usage_events.json", "payments.json", "costs.json"],
+      "outputs": ["pnl_report.json", "margin_alert.json"],
+      "token_budget_per_run": 2000,
+      "max_consecutive_runs": 6
+    },
+    {
+      "id": "allocator-agent",
+      "name": "Profit Allocator",
+      "purpose": "Split profit into AI reinvestment, owner payout, and reserves",
+      "responsibilities": [
+        "Calculate net profit after platform fees and AI costs",
+        "Allocate: AI reinvestment pool, owner draw, emergency reserve",
+        "Persist allocation rules and monthly summaries"
+      ],
+      "inputs": ["pnl_report.json", "allocation_rules.json"],
+      "outputs": ["allocation_plan.json", "monthly_summary.json"],
+      "token_budget_per_run": 1500,
+      "max_consecutive_runs": 4
+    },
+    {
+      "id": "db-migration-agent",
+      "name": "Migration Agent",
+      "purpose": "Convert and transfer databases between environments or formats",
+      "responsibilities": [
+        "Export from source DB with minimal downtime",
+        "Transform schema and data per target requirements",
+        "Validate row counts, constraints, and referential integrity",
+        "Provide rollback script before switching over"
+      ],
+      "inputs": ["source_connection.json", "target_connection.json", "migration_plan.json"],
+      "outputs": ["migration_report.json", "rollback_script.sql"],
+      "token_budget_per_run": 4000,
+      "max_consecutive_runs": 8
+    },
+    {
+      "id": "scraping-agent",
+      "name": "Web Scraping Agent",
+      "purpose": "Scrape X (Twitter) and Reddit for real-world problems, pain points, and difficulties people discuss",
+      "responsibilities": [
+        "Search X/Twitter for problem-related tweets and threads",
+        "Search Reddit (subreddits like r/programming, r/startups, r/saas) for pain points",
+        "Extract and categorize problems by domain, frequency, and severity",
+        "Filter noise and surface actionable problem statements",
+        "Track trending problems over time for market validation"
+      ],
+      "inputs": ["search_queries.json", "platform_credentials.json", "problem_categories.json"],
+      "outputs": ["problem_signals.json", "trending_topics.json", "validated_problems.json"],
+      "token_budget_per_run": 5000,
+      "max_consecutive_runs": 15
+    },
+    {
+      "id": "senior-engineer-agent",
+      "name": "Senior Software Engineer",
+      "purpose": "Build production-ready websites and web applications that solve the scraped problems",
+      "responsibilities": [
+        "Architect full-stack solutions (frontend + backend + database)",
+        "Implement clean, maintainable, scalable code with best practices",
+        "Set up CI/CD, testing, monitoring, and deployment pipelines",
+        "Apply security hardening, performance optimization, and accessibility standards",
+        "Iterate based on QA feedback and real-world usage data",
+        "Document architecture decisions and API contracts"
+      ],
+      "inputs": ["validated_problems.json", "project_plan.json", "tech_stack_preferences.json"],
+      "outputs": ["deployed_app_url.json", "source_code.zip", "architecture_docs.md", "deployment_config.yaml"],
+      "token_budget_per_run": 12000,
+      "max_consecutive_runs": 25
+    },
+    {
+      "id": "cybersecurity-agent",
+      "name": "Cybersecurity Auditor",
+      "purpose": "Perform white-hat security assessments to find and fix vulnerabilities in deployed applications",
+      "responsibilities": [
+        "Automated vulnerability scanning (OWASP Top 10, CVEs, misconfigurations)",
+        "Manual penetration testing: auth bypass, IDOR, XSS, SQLi, SSRF, RCE",
+        "Infrastructure audit: DNS, SSL/TLS, headers, CSP, CORS, secrets exposure",
+        "Code review for security anti-patterns and supply chain risks",
+        "Generate remediation patches and verify fixes",
+        "Produce compliance-ready security reports (SOC2, PCI-DSS aligned)"
+      ],
+      "inputs": ["deployed_app_url.json", "source_code.zip", "architecture_docs.md", "threat_model.json"],
+      "outputs": ["vulnerability_report.json", "remediation_patches.zip", "retest_results.json", "compliance_summary.md"],
+      "token_budget_per_run": 8000,
+      "max_consecutive_runs": 12
+    }
+  ],
+  "default_flow": [
+    "scraping-agent",
+    "lead-finder",
+    "profile-optimizer",
+    "project-manager",
+    "senior-engineer-agent",
+    "code-agent",
+    "cybersecurity-agent",
+    "qa-agent",
+    "billing-agent",
+    "collector-agent",
+    "economics-agent",
+    "allocator-agent"
+  ]
+}
