@@ -133,21 +133,6 @@
       "max_consecutive_runs": 4
     },
     {
-      "id": "db-migration-agent",
-      "name": "Migration Agent",
-      "purpose": "Convert and transfer databases between environments or formats",
-      "responsibilities": [
-        "Export from source DB with minimal downtime",
-        "Transform schema and data per target requirements",
-        "Validate row counts, constraints, and referential integrity",
-        "Provide rollback script before switching over"
-      ],
-      "inputs": ["source_connection.json", "target_connection.json", "migration_plan.json"],
-      "outputs": ["migration_report.json", "rollback_script.sql"],
-      "token_budget_per_run": 4000,
-      "max_consecutive_runs": 8
-    },
-    {
       "id": "scraping-agent",
       "name": "Web Scraping Agent",
       "purpose": "Scrape X (Twitter) and Reddit for real-world problems, pain points, and difficulties people discuss",
