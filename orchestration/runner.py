@@ -18,6 +18,29 @@ from orchestration.workflow_engine import WorkflowEngine
 from tracking.token_tracker import TokenTracker, TokenUsage
 
 
+# Simple cost estimator for free/open models.
+# Rough approximations only; real pricing varies by provider/hardware.
+_MODEL_COST_PER_1K_TOKENS: Dict[str, Dict[str, float]] = {
+    "Qwen/Qwen3-4B-Instruct": {"prompt": 0.0, "completion": 0.0},
+    "google/gemma-2-2b-it": {"prompt": 0.0, "completion": 0.0},
+    "mistralai/Mistral-7B-Instruct-v0.3": {"prompt": 0.0, "completion": 0.0},
+    "meta-llama/Meta-Llama-3-1-8B-Instruct": {"prompt": 0.0, "completion": 0.0},
+    "stub": {"prompt": 0.0, "completion": 0.0},
+}
+
+
+def _estimate_cost(model: str, prompt: str, completion: str) -> float:
+    key = (model or "stub").lower()
+    matched = next(
+        (k for k in _MODEL_COST_PER_1K_TOKENS if k.lower() in key),
+        "stub",
+    )
+    rate = _MODEL_COST_PER_1K_TOKENS.get(matched, {"prompt": 0.0, "completion": 0.0})
+    prompt_tokens = max(len(prompt) // 4, 1)
+    completion_tokens = max(len(completion) // 4, 1)
+    return (prompt_tokens * rate["prompt"] + completion_tokens * rate["completion"]) / 1000.0
+
+
 class AgentContext:
     """Lightweight per-run state bag passed between agents."""
 
@@ -91,16 +114,34 @@ def run_lead_finder(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Di
 
 
 def run_profile_optimizer(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    from lib.hf_llm import HFClient
+
     leads = ctx.get("leads", {}).get("leads", []) if isinstance(ctx.get("leads"), dict) else []
 
     proposals: list = []
+    client = HFClient()
     for lead in leads[:3]:
+        prompt = (
+            "You are a freelance proposal writer.\n"
+            f"Lead: {lead['title']} on {lead['platform']} (budget ${lead['budget_usd']}).\n"
+            "Write a short, professional proposal."
+        )
+        text = ""
+        model_used = client.model
+        usd = 0.0
+        try:
+            text = client.generate(prompt, max_new_tokens=180, temperature=0.7)
+            usd = _estimate_cost(model_used, prompt, text)
+        except Exception:
+            text = f"Proposal for {lead['title']}"
+
         proposals.append(
             {
                 "lead_id": lead["id"],
                 "platform": lead["platform"],
-                "proposal": f"Proposal for {lead['title']}",
+                "proposal": text,
                 "tone": "professional",
+                "model": model_used,
             }
         )
 
@@ -112,24 +153,44 @@ def run_profile_optimizer(ctx: AgentContext, run_id: str, tracker: TokenTracker)
             prompt_tokens=1600,
             completion_tokens=1400,
             total_tokens=3000,
-            est_cost_usd=0.06,
-            model="stub",
+            est_cost_usd=float(usd),
+            model=model_used,
         )
     )
     return {"proposals": proposals, "variant_count": len(proposals)}
 
 
 def run_project_manager(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    from lib.hf_llm import HFClient
+
     proposals = ctx.get("proposals", {}).get("proposals", []) if isinstance(ctx.get("proposals"), dict) else []
 
     milestones: list = []
+    client = HFClient()
+    model_used = client.model
     for i, p in enumerate(proposals[:2] or [{"lead_id": "demo-1", "platform": "upwork"}], start=1):
+        prompt = (
+            "Break this freelance project into 3 milestones with estimated hours.\n"
+            f"Project: {p.get('platform', 'unknown')} - {p.get('lead_id', 'demo')}."
+        )
+        tasks = ["plan", "implement", "review"]
+        usd = 0.0
+        try:
+            text = client.generate(prompt, max_new_tokens=220, temperature=0.5)
+            tasks = [line.strip("- ") for line in text.splitlines() if line.strip()][:3]
+            if len(tasks) < 3:
+                tasks = ["plan", "implement", "review"]
+            usd = _estimate_cost(model_used, prompt, text)
+        except Exception:
+            pass
+
         milestones.append(
             {
                 "milestone": i,
                 "lead_id": p.get("lead_id"),
-                "tasks": ["plan", "implement", "review"],
+                "tasks": tasks,
                 "estimated_hours": 8 * i,
+                "model": model_used,
             }
         )
 
@@ -141,8 +202,8 @@ def run_project_manager(ctx: AgentContext, run_id: str, tracker: TokenTracker) -
             prompt_tokens=1200,
             completion_tokens=1300,
             total_tokens=2500,
-            est_cost_usd=0.05,
-            model="stub",
+            est_cost_usd=float(usd or 0.0),
+            model=model_used,
         )
     )
     return {"milestones": milestones, "project_count": len(milestones)}
@@ -455,11 +516,146 @@ def run_cybersecurity_agent(ctx: AgentContext, run_id: str, tracker: TokenTracke
     }
 
 
+def run_crypto_stock_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    """Analyze crypto/stock markets, execute buy/sell orders, and track PnL."""
+    # In production this would integrate with exchange APIs (Binance, Coinbase, Alpaca, etc.)
+    # For the sandbox, we simulate realistic portfolio data and trade decisions.
+    
+    portfolio = ctx.get("portfolio") or {"holdings": []}
+    
+    # Simulated market analysisominations for profit potential
+    market_opportunities = [
+        {"symbol": "BTC-USD", "price": 67234.50, "rsi": 42.3, "signal": "buy", "confidence": 0.87, "target_sell": 72000.0, "stop_loss": 64500.0},
+        {"symbol": "ETH-USD", "price": 3456.20, "rsi": 38.1, "signal": "buy", "confidence": 0.82, "target_sell": 3800.0, "stop_loss": 3200.0},
+        {"symbol": "AAPL", "price": 189.45, "rsi": 45.7, "signal": "buy", "confidence": 0.75, "target_sell": 210.0, "stop_loss": 175.0},
+        {"symbol": "NVDA", "price": 142.30, "rsi": 55.2, "signal": "hold", "confidence": 0.68, "target_sell": 155.0, "stop_loss": 128.0},
+        {"symbol": "SOL-USD", "price": 156.80, "rsi": 62.1, "signal": "sell", "confidence": 0.79, "target_sell": 165.0, "stop_loss": 138.0},
+    ]
+    
+    trades_executed = []
+    for opp in market_opportunities:
+        if opp["signal"] in ("buy", "sell"):
+            trade = {
+                "run_id": run_id,
+                "symbol": opp["symbol"],
+                "action": opp["signal"],
+                "price": opp["price"],
+                "confidence": opp["confidence"],
+                "target_sell": opp["target_sell"],
+                "stop_loss": opp["stop_loss"],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": "executed",
+            }
+            trades_executed.append(trade)
+    
+    # Portfolio summary
+    portfolio_value = sum(o["price"] for o in market_opportunities)
+    portfolio_report = {
+        "total_value_usd": round(portfolio_value, 2),
+        "trades_today": len(trades_executed),
+        "holdings": [o["symbol"] for o in market_opportunities],
+        "unrealized_pnl_usd": round((72000 - 67234.50) + (3800 - 3456.20), 2),
+        "cash_reserve_usd": 2500.00,
+    }
+    
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="crypto-stock-agent",
+            prompt_tokens=6000,
+            completion_tokens=9000,
+            total_tokens=15000,
+            est_cost_usd=0.45,
+            model="stub",
+        )
+    )
+    
+    return {
+        "trade_executions": trades_executed,
+        "portfolio_report": portfolio_report,
+        "pnl_summary": portfolio_report,
+        "trade_count": len(trades_executed),
+        "risk_adjusted_return": 0.127,
+    }
+
+
+def run_domain_flip_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    """Search, analyze, and flip domains for profit."""
+    # In production this would integrate with WHOIS APIs, domain auction sites,
+    # and marketplace APIs (Sedo, Afternic, GoDaddy, Namecheap).
+    
+    # Simulated domain opportunities
+    domains_discovered = [
+        {"domain": "aisaaspro.com", "registrar": "GoDaddy", "asking_price": 12.99, "est_value": 4500, "da": 28, "backlinks": 340, "strategy": "buy_now"},
+        {"domain": "cryptoflips.io", "registrar": "Namecheap", "asking_price": 8.88, "est_value": 3200, "da": 15, "backlinks": 120, "strategy": "buy_now"},
+        {"domain": "cloudninja.dev", "registrar": "Porkbun", "asking_price": 15.00, "est_value": 2800, "da": 12, "backlinks": 89, "strategy": "bid"},
+        {"domain": "web3guild.net", "registrar": "Dynadot", "asking_price": 9.99, "est_value": 1800, "da": 8, "backlinks": 45, "strategy": "watch"},
+        {"domain": "dataseer.ai", "registrar": "GoDaddy", "asking_price": 29.99, "est_value": 8500, "da": 35, "backlinks": 560, "strategy": "buy_now"},
+    ]
+    
+    purchased = []
+    listed = []
+    total_invested = 0.0
+    total_est_value = 0.0
+    
+    for dom in domains_discovered:
+        if dom["strategy"] == "buy_now":
+            purchased.append({
+                "domain": dom["domain"],
+                "purchase_price": dom["asking_price"],
+                "est_value": dom["est_value"],
+                "roi_pct": round((dom["est_value"] - dom["asking_price"]) / dom["asking_price"] * 100, 2),
+                "purchased_at": datetime.now(timezone.utc).isoformat(),
+                "status": "owned",
+            })
+            total_invested += dom["asking_price"]
+            total_est_value += dom["est_value"]
+    
+    # Simulated listings on marketplaces
+    for p in purchased:
+        listed.append({
+            "domain": p["domain"],
+            "listing_price": round(p["est_value"] * 0.7, 2),
+            "marketplace": "Sedo",
+            "status": "active",
+            "listed_at": datetime.now(timezone.utc).isoformat(),
+        })
+    
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="domain-flip-agent",
+            prompt_tokens=3200,
+            completion_tokens=4800,
+            total_tokens=8000,
+            est_cost_usd=0.24,
+            model="stub",
+        )
+    )
+    
+    return {
+        "purchased_domains": purchased,
+        "listed_domains": listed,
+        "flip_profit_report": {
+            "total_invested_usd": round(total_invested, 2),
+            "total_est_value_usd": round(total_est_value, 2),
+            "projected_profit_usd": round(total_est_value - total_invested, 2),
+            "projected_roi_pct": round((total_est_value - total_invested) / total_invested * 100, 2) if total_invested else 0.0,
+            "domains_owned": len(purchased),
+            "domains_listed": len(listed),
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
 AGENTS: Dict[str, Any] = {
+    "crypto-stock-agent": run_crypto_stock_agent,
+    "domain-flip-agent": run_domain_flip_agent,
     "lead-finder": run_lead_finder,
     "profile-optimizer": run_profile_optimizer,
     "project-manager": run_project_manager,

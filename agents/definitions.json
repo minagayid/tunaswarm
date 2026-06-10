@@ -4,6 +4,38 @@
   "summary": "Specialized AI agents that find, win, deliver, and monetize freelance projects while managing token costs and profit allocation.",
   "agents": [
     {
+      "id": "crypto-stock-agent",
+      "name": "Crypto & Stock Trading Agent",
+      "purpose": "Analyze crypto and stock markets, execute buy/sell orders, and optimize portfolio to maximize profit",
+      "responsibilities": [
+        "Fetch real-time and historical market data from crypto exchanges and stock APIs",
+        "Perform technical analysis (moving averages, RSI, MACD, Bollinger Bands)",
+        "Execute buy/sell orders with risk management (stop-loss, take-profit)",
+        "Track portfolio performance, PnL, and generate trade reports",
+        "Rebalance portfolio based on profit targets and market conditions"
+      ],
+      "inputs": ["portfolio.json", "market_data.json", "trading_rules.json", "exchange_credentials.json"],
+      "outputs": ["trade_executions.json", "portfolio_report.json", "pnl_summary.json"],
+      "token_budget_per_run": 15000,
+      "max_consecutive_runs": 30
+    },
+    {
+      "id": "domain-flip-agent",
+      "name": "Domain Flipping Agent",
+      "purpose": "Search, analyze domains for value, purchase undervalued domains, and sell for profit",
+      "responsibilities": [
+        "Search domain registrars and auction sites for undervalued domains",
+        "Analyze domain metrics (DA, backlinks, keyword value, brandability, extension rarity)",
+        "Purchase undervalued domains using pricing and timing strategies",
+        "List domains on marketplaces (Sedo, Afternic, GoDaddy Auctions) with optimized pricing",
+        "Track sales, ROI, and optimize acquisition/inventory strategy"
+      ],
+      "inputs": ["domain_watchlist.json", "market_trends.json", "budget.json", "pricing_rules.json"],
+      "outputs": ["purchased_domains.json", "listed_domains.json", "flip_profit_report.json"],
+      "token_budget_per_run": 8000,
+      "max_consecutive_runs": 20
+    },
+    {
       "id": "lead-finder",
       "name": "Lead Finder",
       "purpose": "Scan freelance platforms for opportunities matching owner skills",
@@ -184,6 +216,8 @@
     }
   ],
   "default_flow": [
+    "crypto-stock-agent",
+    "domain-flip-agent",
     "scraping-agent",
     "lead-finder",
     "profile-optimizer",

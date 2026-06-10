@@ -36,7 +36,7 @@ class TestDefinitions:
             data = json.load(f)
         assert "agents" in data
         assert "default_flow" in data
-        assert len(data["agents"]) >= 9
+        assert len(data["agents"]) >= 14
 
     def test_default_flow_matches_registry(self, definitions_path: str):
         with open(definitions_path, encoding="utf-8") as f:
@@ -63,7 +63,7 @@ class TestAgentRunners:
             keys = list(result.keys())
             assert keys, f"{agent_id}: dict has no keys"
 
-    def test_full_twelve_agent_flow(self, definitions_path: str, fresh_data_dir: str):
+    def test_full_fourteen_agent_flow(self, definitions_path: str, fresh_data_dir: str):
         runner = SwarmRunner(data_dir=fresh_data_dir, definitions_path=definitions_path)
         ctx = AgentContext()
         run_id = "sandbox-flow-test"
@@ -77,7 +77,10 @@ class TestAgentRunners:
             outputs[aid] = res
             ctx.set(aid, res)
 
-        assert len(outputs) == 12, f"Expected 12 agents, ran {len(outputs)}"
+        assert len(outputs) == 14, f"Expected 14 agents, ran {len(outputs)}"
         # economics and allocator should produce real-looking keys
         assert "revenue_usd" in outputs["economics-agent"], "economics-agent missing revenue"
         assert "net_profit_usd" in outputs["allocator-agent"], "allocator-agent missing net_profit"
+        # crypto and domain agents should produce profit data
+        assert "trade_executions" in outputs["crypto-stock-agent"], "crypto agent missing trade executions"
+        assert "flip_profit_report" in outputs["domain-flip-agent"], "domain agent missing profit report"
