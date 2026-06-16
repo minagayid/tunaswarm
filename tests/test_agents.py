@@ -36,7 +36,7 @@ class TestDefinitions:
             data = json.load(f)
         assert "agents" in data
         assert "default_flow" in data
-        assert len(data["agents"]) >= 14
+        assert len(data["agents"]) >= 21
 
     def test_default_flow_matches_registry(self, definitions_path: str):
         with open(definitions_path, encoding="utf-8") as f:
@@ -63,7 +63,7 @@ class TestAgentRunners:
             keys = list(result.keys())
             assert keys, f"{agent_id}: dict has no keys"
 
-    def test_full_fourteen_agent_flow(self, definitions_path: str, fresh_data_dir: str):
+    def test_full_twenty_one_agent_flow(self, definitions_path: str, fresh_data_dir: str):
         runner = SwarmRunner(data_dir=fresh_data_dir, definitions_path=definitions_path)
         ctx = AgentContext()
         run_id = "sandbox-flow-test"
@@ -77,7 +77,15 @@ class TestAgentRunners:
             outputs[aid] = res
             ctx.set(aid, res)
 
-        assert len(outputs) == 14, f"Expected 14 agents, ran {len(outputs)}"
+        assert len(outputs) == 21, f"Expected 21 agents, ran {len(outputs)}"
+        # executive agents should produce strategy/operations/people/legal outputs
+        assert "strategic_plan" in outputs["ceo-agent"], "ceo-agent missing strategic plan"
+        assert "financial_plan" in outputs["cfo-agent"], "cfo-agent missing financial plan"
+        assert "operational_plan" in outputs["coo-agent"], "coo-agent missing operational plan"
+        assert "marketing_strategy" in outputs["cmo-agent"], "cmo-agent missing marketing strategy"
+        assert "hiring_plan" in outputs["chro-agent"], "chro-agent missing hiring plan"
+        assert "contract_reviews" in outputs["general-counsel-agent"], "general-counsel-agent missing contract reviews"
+        assert "deployed_app_url" in outputs["software-engineer-agent"], "software-engineer-agent missing deploy URL"
         # economics and allocator should produce real-looking keys
         assert "revenue_usd" in outputs["economics-agent"], "economics-agent missing revenue"
         assert "net_profit_usd" in outputs["allocator-agent"], "allocator-agent missing net_profit"

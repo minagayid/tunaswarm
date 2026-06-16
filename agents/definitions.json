@@ -213,9 +213,134 @@
       "outputs": ["vulnerability_report.json", "remediation_patches.zip", "retest_results.json", "compliance_summary.md"],
       "token_budget_per_run": 8000,
       "max_consecutive_runs": 12
+    },
+    {
+      "id": "ceo-agent",
+      "name": "Chief Executive Officer (CEO)",
+      "purpose": "Define vision, strategy, and growth direction with final decision-making authority across the firm",
+      "responsibilities": [
+        "Define company vision and mission",
+        "Set long-term strategic objectives",
+        "Approve budgets and major investments",
+        "Build executive leadership team",
+        "Manage investor and board relationships",
+        "Drive company culture"
+      ],
+      "inputs": ["market_conditions.json", "board_directives.json", "executive_reports.json"],
+      "outputs": ["strategic_plan.md", "investment_decisions.json", "board_communications.md"],
+      "token_budget_per_run": 8000,
+      "max_consecutive_runs": 10
+    },
+    {
+      "id": "cfo-agent",
+      "name": "Chief Financial Officer (CFO)",
+      "purpose": "Oversee financial planning, reporting, and capital allocation for sustained profitability",
+      "responsibilities": [
+        "Financial planning and analysis",
+        "Manage capital structure and fundraising",
+        "Oversee accounting, treasury, and reporting",
+        "Model scenarios for investments and ventures",
+        "Ensure regulatory financial compliance",
+        "Present financials to board and investors"
+      ],
+      "inputs": ["pnl_report.json", "allocation_plan.json", "market_data.json", "budget_requests.json"],
+      "outputs": ["financial_plan.md", "capital_allocation.json", "board_financial_report.md"],
+      "token_budget_per_run": 6000,
+      "max_consecutive_runs": 8
+    },
+    {
+      "id": "coo-agent",
+      "name": "Chief Operating Officer (COO)",
+      "purpose": "Manage day-to-day business operations, process optimization, and cross-functional execution",
+      "responsibilities": [
+        "Operational planning and resourcing",
+        "Process optimization and automation",
+        "Resource allocation across teams and agents",
+        "Performance monitoring and KPI tracking",
+        "Cross-department coordination",
+        "Drive operational efficiency"
+      ],
+      "inputs": ["operations_metrics.json", "resource_availability.json", "project_plans.json"],
+      "outputs": ["operational_plan.md", "efficiency_report.json", "resource_assignments.json"],
+      "token_budget_per_run": 7000,
+      "max_consecutive_runs": 10
+    },
+    {
+      "id": "cmo-agent",
+      "name": "Chief Marketing Officer (CMO)",
+      "purpose": "Drive brand strategy, demand generation, and customer acquisition across all channels",
+      "responsibilities": [
+        "Brand strategy and positioning",
+        "Marketing campaigns across digital channels",
+        "Demand generation and lead funnel optimization",
+        "Market research and competitive intelligence",
+        "Product marketing and messaging",
+        "Analytics and attribution modeling"
+      ],
+      "inputs": ["market_research.json", "competitor_analysis.json", "campaign_budget.json"],
+      "outputs": ["marketing_strategy.md", "campaign_plans.json", "demand_forecast.json"],
+      "token_budget_per_run": 6000,
+      "max_consecutive_runs": 8
+    },
+    {
+      "id": "chro-agent",
+      "name": "Chief Human Resources Officer (CHRO)",
+      "purpose": "Oversee talent strategy, organizational development, and culture across the firm",
+      "responsibilities": [
+        "Talent acquisition and hiring strategy",
+        "Employee onboarding and development",
+        "Compensation planning and benefits",
+        "Performance management and reviews",
+        "Culture development and employee engagement",
+        "HR compliance and policy management"
+      ],
+      "inputs": ["headcount_plans.json", "salary_benchmarks.json", "employee_feedback.json"],
+      "outputs": ["hiring_plan.md", "org_chart.json", "compensation_structure.json"],
+      "token_budget_per_run": 5000,
+      "max_consecutive_runs": 6
+    },
+    {
+      "id": "general-counsel-agent",
+      "name": "General Counsel",
+      "purpose": "Lead legal strategy, compliance, contracts, and risk management for the firm",
+      "responsibilities": [
+        "Contract drafting and review",
+        "Legal compliance and regulatory adherence",
+        "Intellectual property management",
+        "Risk assessment and mitigation",
+        "Litigation management and dispute resolution",
+        "Corporate governance and board support"
+      ],
+      "inputs": ["contracts.json", "regulatory_requirements.json", "risk_assessments.json"],
+      "outputs": ["legal_opinions.md", "contract_reviews.json", "compliance_report.md"],
+      "token_budget_per_run": 6000,
+      "max_consecutive_runs": 5
+    },
+    {
+      "id": "software-engineer-agent",
+      "name": "Software Engineer",
+      "purpose": "Design, build, and maintain scalable software systems across the firm's product lines",
+      "responsibilities": [
+        "Full-stack development (frontend + backend + database)",
+        "API design and integration",
+        "Code review and quality assurance",
+        "Technical documentation",
+        "Performance optimization",
+        "CI/CD pipeline maintenance"
+      ],
+      "inputs": ["project_plan.json", "milestone_n.json", "architecture_docs.md"],
+      "outputs": ["deployed_app_url.json", "source_code.zip", "api_docs.md"],
+      "token_budget_per_run": 10000,
+      "max_consecutive_runs": 20
     }
   ],
   "default_flow": [
+    "ceo-agent",
+    "cfo-agent",
+    "coo-agent",
+    "cmo-agent",
+    "chro-agent",
+    "general-counsel-agent",
     "crypto-stock-agent",
     "domain-flip-agent",
     "scraping-agent",
@@ -224,6 +349,7 @@
     "project-manager",
     "senior-engineer-agent",
     "code-agent",
+    "software-engineer-agent",
     "cybersecurity-agent",
     "qa-agent",
     "billing-agent",

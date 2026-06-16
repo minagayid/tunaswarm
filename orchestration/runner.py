@@ -119,31 +119,49 @@ def run_profile_optimizer(ctx: AgentContext, run_id: str, tracker: TokenTracker)
     leads = ctx.get("leads", {}).get("leads", []) if isinstance(ctx.get("leads"), dict) else []
 
     proposals: list = []
-    client = HFClient()
-    for lead in leads[:3]:
-        prompt = (
-            "You are a freelance proposal writer.\n"
-            f"Lead: {lead['title']} on {lead['platform']} (budget ${lead['budget_usd']}).\n"
-            "Write a short, professional proposal."
-        )
-        text = ""
-        model_used = client.model
-        usd = 0.0
-        try:
-            text = client.generate(prompt, max_new_tokens=180, temperature=0.7)
-            usd = _estimate_cost(model_used, prompt, text)
-        except Exception:
-            text = f"Proposal for {lead['title']}"
+    client = None
+    model_used = "stub"
+    text = ""
+    usd = 0.0
+    try:
+        client = HFClient()
+    except Exception:
+        client = None
 
-        proposals.append(
-            {
-                "lead_id": lead["id"],
-                "platform": lead["platform"],
-                "proposal": text,
-                "tone": "professional",
-                "model": model_used,
-            }
-        )
+    if client is not None:
+        for lead in leads[:3]:
+            prompt = (
+                "You are a freelance proposal writer.\n"
+                f"Lead: {lead['title']} on {lead['platform']} (budget ${lead['budget_usd']}).\n"
+                "Write a short, professional proposal."
+            )
+            model_used = client.model
+            try:
+                text = client.generate(prompt, max_new_tokens=180, temperature=0.7)
+                usd = _estimate_cost(model_used, prompt, text)
+            except Exception:
+                text = f"Proposal for {lead['title']}"
+
+            proposals.append(
+                {
+                    "lead_id": lead["id"],
+                    "platform": lead["platform"],
+                    "proposal": text,
+                    "tone": "professional",
+                    "model": model_used,
+                }
+            )
+    else:
+        for lead in leads[:3]:
+            proposals.append(
+                {
+                    "lead_id": lead["id"],
+                    "platform": lead["platform"],
+                    "proposal": f"Proposal for {lead['title']}",
+                    "tone": "professional",
+                    "model": "stub",
+                }
+            )
 
     tracker.record_usage(
         TokenUsage(
@@ -166,23 +184,31 @@ def run_project_manager(ctx: AgentContext, run_id: str, tracker: TokenTracker) -
     proposals = ctx.get("proposals", {}).get("proposals", []) if isinstance(ctx.get("proposals"), dict) else []
 
     milestones: list = []
-    client = HFClient()
-    model_used = client.model
+    client = None
+    model_used = "stub"
+    text = ""
+    usd = 0.0
+    try:
+        client = HFClient()
+    except Exception:
+        client = None
+
     for i, p in enumerate(proposals[:2] or [{"lead_id": "demo-1", "platform": "upwork"}], start=1):
         prompt = (
             "Break this freelance project into 3 milestones with estimated hours.\n"
             f"Project: {p.get('platform', 'unknown')} - {p.get('lead_id', 'demo')}."
         )
         tasks = ["plan", "implement", "review"]
-        usd = 0.0
-        try:
-            text = client.generate(prompt, max_new_tokens=220, temperature=0.5)
-            tasks = [line.strip("- ") for line in text.splitlines() if line.strip()][:3]
-            if len(tasks) < 3:
-                tasks = ["plan", "implement", "review"]
-            usd = _estimate_cost(model_used, prompt, text)
-        except Exception:
-            pass
+        if client is not None:
+            try:
+                text = client.generate(prompt, max_new_tokens=220, temperature=0.5)
+                model_used = client.model
+                tasks = [line.strip("- ") for line in text.splitlines() if line.strip()][:3]
+                if len(tasks) < 3:
+                    tasks = ["plan", "implement", "review"]
+                usd = _estimate_cost(model_used, prompt, text)
+            except Exception:
+                pass
 
         milestones.append(
             {
@@ -375,6 +401,191 @@ def run_allocator_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -
         "ai_reinvestment_usd": reinvest,
         "emergency_reserve_usd": reserve,
         "rules_used": rules,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Executive leadership agents
+# ---------------------------------------------------------------------------
+
+
+def _record_ceo_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="ceo-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_ceo_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    _record_ceo_usage(run_id, tracker, prompt=3200, completion=4800, usd=0.22)
+    return {
+        "strategic_plan": "Expansion into enterprise automation services; Q1-Q2 roadmap prioritized",
+        "investment_decisions": {"approved_capital_usd": 150000, "focus_areas": ["R&D", "Hiring", "Marketing"]},
+        "board_communications": "Board aligned on FY growth targets",
+    }
+
+
+def _record_cfo_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="cfo-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_cfo_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    allocation = ctx.get("allocator-agent", {}) or {}
+    econs = ctx.get("economics-agent", {}) or {}
+    _record_cfo_usage(run_id, tracker, prompt=2400, completion=3600, usd=0.18)
+    return {
+        "financial_plan": "Budget approved based on net profit forecast",
+        "capital_allocation": {
+            "reinvestment": allocation.get("ai_reinvestment_usd", 0.0),
+            "owner_draw": allocation.get("owner_payout_usd", 0.0),
+            "reserve": allocation.get("emergency_reserve_usd", 0.0),
+        },
+        "board_financial_report": {"revenue": econs.get("revenue_usd", 0.0), "net_profit": econs.get("net_profit_usd", 0.0)},
+    }
+
+
+def _record_coo_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="coo-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_coo_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    project_plans = ctx.get("project-manager", {}) or {}
+    _record_coo_usage(run_id, tracker, prompt=2600, completion=4400, usd=0.20)
+    return {
+        "operational_plan": "Sequenced delivery by dependency and resource availability",
+        "efficiency_report": {"cycle_time_hours": 12, "utilization_pct": 0.82},
+        "resource_assignments": {"allocated_agents": project_plans.get("project_count", 0)},
+    }
+
+
+def _record_cmo_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="cmo-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_cmo_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    _record_cmo_usage(run_id, tracker, prompt=2200, completion=3800, usd=0.18)
+    return {
+        "marketing_strategy": "Content-led demand gen focused on SEO and case studies",
+        "campaign_plans": [{"name": "Acquire MRR", "channel": "Newsletter + Retargeting"}],
+        "demand_forecast": {"expected_leads": 120, "cpl_usd": 45},
+    }
+
+
+def _record_chro_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="chro-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_chro_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    _record_chro_usage(run_id, tracker, prompt=1800, completion=3200, usd=0.15)
+    return {
+        "hiring_plan": {"next_roles": ["Software Engineer", "QA Engineer"], "timeline_weeks": 4},
+        "org_chart": {"total_headcount": 12, "departments": ["Engineering", "Marketing", "Operations"]},
+        "compensation_structure": {"midpoint_salary_usd": 95000, "bands": ["Junior", "Mid", "Senior", "Lead"]},
+    }
+
+
+def _record_general_counsel_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="general-counsel-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_general_counsel_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    _record_general_counsel_usage(run_id, tracker, prompt=2000, completion=4000, usd=0.17)
+    return {
+        "contract_reviews": {"pending_review": 3, "high_risk": 1},
+        "compliance_report": {"frameworks": ["SOC2", "GDPR"], "status": "compliant"},
+        "risk_flag": False,
+    }
+
+
+def _record_software_engineer_usage(run_id: str, tracker: TokenTracker, prompt: int, completion: int, usd: float) -> None:
+    tracker.record_usage(
+        TokenUsage(
+            ts=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            agent_id="software-engineer-agent",
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            est_cost_usd=round(usd, 4),
+            model="stub",
+        )
+    )
+
+
+def run_software_engineer_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker) -> Dict[str, Any]:
+    project = ctx.get("project-manager", {}) or {}
+    milestones = project.get("milestones", [])
+    deliverable_count = max(len(milestones), 1)
+    files = ["src/main.py", "src/models.py", "tests/test_main.py", "README.md"]
+    _record_software_engineer_usage(run_id, tracker, prompt=4800, completion=5200, usd=0.28)
+    return {
+        "deployed_app_url": {"url": "https://staging.example.com", "status": "deployed"},
+        "source_files": files[: deliverable_count * 2],
+        "deliverable_count": deliverable_count,
+        "ready_for_qa": True,
     }
 
 
@@ -654,6 +865,13 @@ def run_domain_flip_agent(ctx: AgentContext, run_id: str, tracker: TokenTracker)
 # ---------------------------------------------------------------------------
 
 AGENTS: Dict[str, Any] = {
+    "ceo-agent": run_ceo_agent,
+    "cfo-agent": run_cfo_agent,
+    "coo-agent": run_coo_agent,
+    "cmo-agent": run_cmo_agent,
+    "chro-agent": run_chro_agent,
+    "general-counsel-agent": run_general_counsel_agent,
+    "software-engineer-agent": run_software_engineer_agent,
     "crypto-stock-agent": run_crypto_stock_agent,
     "domain-flip-agent": run_domain_flip_agent,
     "lead-finder": run_lead_finder,
