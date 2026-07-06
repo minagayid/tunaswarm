@@ -20,7 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     workflow = sub.add_parser("workflow", help="Workflow commands")
     workflow_sub = workflow.add_subparsers(dest="workflow_command")
     workflow_sub.add_parser("list-runs", help="List workflow runs")
-    workflow_sub.add_parser("start", help="Start a new workflow run")
+    w_start = workflow_sub.add_parser("start", help="Start a new workflow run")
+    w_start.add_argument("--run", action="store_true", help="Also execute the default agent flow")
     w_get = workflow_sub.add_parser("get", help="Get a run")
     w_get.add_argument("run_id")
     w_resume = workflow_sub.add_parser("resume", help="Resume a run")
@@ -40,6 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
     alloc.add_argument("--owner", type=float, help="Owner payout percentage")
     alloc.add_argument("--reinvestment", type=float, help="AI reinvestment percentage")
     alloc.add_argument("--reserve", type=float, help="Emergency reserve percentage")
+    alloc.add_argument("--year", type=int, help="Report year (defaults to current)")
+    alloc.add_argument("--month", type=int, help="Report month (defaults to current)")
+    alloc.add_argument("--revenue", type=float, default=0.0, help="Monthly revenue in USD")
+    alloc.add_argument("--ai-cost", type=float, default=0.0, help="Monthly AI cost in USD")
+    alloc.add_argument("--fees", type=float, default=0.0, help="Monthly platform fees in USD")
 
     return parser
 
@@ -58,6 +64,14 @@ def init_budgets(data_dir: Path) -> None:
         )
         tracker.upsert_budget(budget)
         print(f"Budget set: {agent['id']} -> {budget.budget_per_run} tokens/run")
+
+
+def _load_saved_rules(data_dir: Path) -> AllocationRules:
+    """Use rules previously saved via `allocate --rules`, else defaults."""
+    rules_path = data_dir / "allocation_rules.json"
+    if rules_path.exists():
+        return AllocationRules.from_dict(json.loads(rules_path.read_text(encoding="utf-8")))
+    return AllocationRules()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -84,15 +98,37 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "workflow":
         engine = WorkflowEngine(data_dir=data_dir.as_posix())
         if args.workflow_command == "list-runs":
-            with __import__("sqlite3").connect((data_dir / "workflow.db").as_posix()) as conn:
-                rows = conn.execute("SELECT id, status, current_agent, current_step, total_steps, updated_at FROM workflow_runs ORDER BY created_at DESC").fetchall()
-            for row in rows:
-                print(json.dumps({"id": row[0], "status": row[1], "current_agent": row[2], "current_step": row[3], "total_steps": row[4], "updated_at": row[5]}, indent=2))
+            for run in engine.list_runs():
+                print(json.dumps({"id": run.id, "status": run.status, "current_agent": run.current_agent, "current_step": run.current_step, "total_steps": run.total_steps, "updated_at": run.updated_at}, indent=2))
             return 0
         if args.workflow_command == "start":
+            from orchestration.runner import SwarmRunner
+
+            runner = SwarmRunner(
+                data_dir=data_dir.as_posix(),
+                definitions_path=(data_dir.parent / "agents" / "definitions.json").as_posix(),
+            )
             run_id = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).strftime("run-%Y%m%d-%H%M%S")
-            run = engine.start_run(run_id=run_id, total_steps=5, metadata={"runner": "cli"})
-            print(json.dumps({"run_id": run.id, "status": run.status, "current_step": run.current_step, "total_steps": run.total_steps}, indent=2))
+            run = engine.start_run(run_id=run_id, total_steps=len(runner.default_flow), metadata={"runner": "cli"})
+            out: dict[str, Any] = {"run_id": run.id, "status": run.status, "current_step": run.current_step, "total_steps": run.total_steps}
+            if args.run:
+                summary = runner.run_all(run_id)
+                final = engine.get_run(run_id)
+                out["status"] = final.status if final else "unknown"
+                out["failed_at"] = summary.get("_failed_at")
+                out["agents_completed"] = [k for k in summary if not k.startswith("_") and "error" not in summary[k]]
+            print(json.dumps(out, indent=2))
+            return 0
+        if args.workflow_command == "resume":
+            from orchestration.runner import SwarmRunner
+
+            runner = SwarmRunner(
+                data_dir=data_dir.as_posix(),
+                definitions_path=(data_dir.parent / "agents" / "definitions.json").as_posix(),
+            )
+            summary = runner.resume(args.run_id, args.agent_id)
+            final = engine.get_run(args.run_id)
+            print(json.dumps({"run_id": args.run_id, "status": final.status if final else "unknown", "failed_at": summary.get("_failed_at"), "agents_completed": [k for k in summary if not k.startswith("_") and "error" not in summary[k]]}, indent=2))
             return 0
         if args.workflow_command == "get":
             run = engine.get_run(args.run_id)
@@ -106,6 +142,33 @@ def main(argv: list[str] | None = None) -> int:
         allocator = ProfitAllocator(data_dir=data_dir.as_posix())
         if args.history:
             print(json.dumps(allocator.latest_allocations(), indent=2))
+            return 0
+        if args.report:
+            today = __import__("datetime").date.today()
+            report = allocator.create_monthly_report(
+                year=args.year or today.year,
+                month=args.month or today.month,
+                revenue_usd=args.revenue,
+                ai_cost_usd=args.ai_cost,
+                platform_fees_usd=args.fees,
+            )
+            print(json.dumps({"report_id": report.id, "net_profit_usd": report.net_profit_usd}, indent=2))
+            return 0
+        if args.apply:
+            today = __import__("datetime").date.today()
+            report_id = f"mrr-{args.year or today.year}-{(args.month or today.month):02d}"
+            rules = _load_saved_rules(data_dir)
+            try:
+                allocation = allocator.allocate_profit(report_id, rules=rules)
+            except ValueError as exc:
+                print(json.dumps({"error": str(exc)}), file=sys.stderr)
+                return 1
+            print(json.dumps({
+                "allocation_id": allocation.id,
+                "owner_payout_usd": allocation.owner_payout_usd,
+                "ai_reinvestment_usd": allocation.ai_reinvestment_usd,
+                "emergency_reserve_usd": allocation.emergency_reserve_usd,
+            }, indent=2))
             return 0
         if args.rules:
             rules = AllocationRules(

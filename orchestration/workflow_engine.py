@@ -134,6 +134,43 @@ class WorkflowEngine:
             conn.commit()
         self._record_event(run_id, "system", "run_completed", {})
 
+    def resume_run(self, run_id: str, agent_id: Optional[str] = None) -> WorkflowRun:
+        """Put a failed/stalled run back into the running state.
+
+        Records a ``run_resumed`` event so the timeline shows the gap.
+        """
+        run = self.get_run(run_id)
+        if not run:
+            raise ValueError(f"Run not found: {run_id}")
+        if run.status == "completed":
+            raise ValueError(f"Run already completed: {run_id}")
+        now = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "UPDATE workflow_runs SET status = 'running', updated_at = ?, finished_at = NULL WHERE id = ?",
+                (now, run_id),
+            )
+            conn.commit()
+        self._record_event(run_id, agent_id or "system", "run_resumed", {"from_status": run.status})
+        return self.get_run(run_id)  # type: ignore[return-value]
+
+    def list_runs(self, limit: int = 50) -> List[WorkflowRun]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT id, status, current_agent, current_step, total_steps, created_at, updated_at, finished_at, metadata "
+                "FROM workflow_runs ORDER BY created_at DESC LIMIT ?",
+                (int(limit),),
+            )
+            rows = cursor.fetchall()
+        return [
+            WorkflowRun(
+                id=row[0], status=row[1], current_agent=row[2], current_step=row[3],
+                total_steps=row[4], created_at=row[5], updated_at=row[6], finished_at=row[7],
+                metadata=json.loads(row[8]) if row[8] else {},
+            )
+            for row in rows
+        ]
+
     def get_run(self, run_id: str) -> Optional[WorkflowRun]:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT id, status, current_agent, current_step, total_steps, created_at, updated_at, finished_at, metadata FROM workflow_runs WHERE id = ?", (run_id,))

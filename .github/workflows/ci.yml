@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test deps
+        run: pip install -r requirements.txt
+      - name: Unit tests
+        run: PYTHONPATH=. python -m pytest tests/ -v
+      - name: Smoke tests
+        run: PYTHONPATH=. python tests/smoke_tests.py
+      - name: CLI smoke
+        run: |
+          PYTHONPATH=. python cli/cli.py workflow start
+          PYTHONPATH=. python cli/cli.py workflow list-runs
+          PYTHONPATH=. python cli/cli.py allocate --report --revenue 1000 --ai-cost 100 --fees 50
+          PYTHONPATH=. python cli/cli.py allocate --apply

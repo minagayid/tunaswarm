@@ -898,11 +898,12 @@ class SwarmRunner:
         self.engine = WorkflowEngine(data_dir=data_dir)
         self.tracker = TokenTracker(data_dir=data_dir)
         self.ctx = AgentContext()
+        self.default_flow: list = list(AGENTS.keys())
         if definitions_path:
             p = Path(definitions_path)
             if p.exists():
                 data = json.loads(p.read_text())
-                self.default_flow: list = data.get("default_flow", list(AGENTS.keys()))
+                self.default_flow = data.get("default_flow", self.default_flow)
 
     def execute(self, run_id: str, agent_id: str) -> Dict[str, Any]:
         fn = AGENTS.get(agent_id)
@@ -916,19 +917,51 @@ class SwarmRunner:
         self.ctx.set(key, result)
         return result
 
-    def run_step(self, run_id: str, agent_id: str) -> Dict[str, Any]:
-        result = self.execute(run_id, agent_id)
-        self.engine.record_agent_complete(run_id, agent_id, result)
-        return result
+    def run_step(self, run_id: str, agent_id: str, max_retries: int = 1) -> Dict[str, Any]:
+        """Execute one agent with bounded retries before giving up."""
+        last_error: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            try:
+                result = self.execute(run_id, agent_id)
+                self.engine.record_agent_complete(run_id, agent_id, result)
+                return result
+            except AgentError:
+                raise  # unknown agent: retrying can't help
+            except Exception as exc:
+                last_error = exc
+        raise AgentError(f"{agent_id} failed after {max_retries + 1} attempts: {last_error}") from last_error
 
-    def run_all(self, run_id: str, flow: Optional[list] = None) -> Dict[str, Any]:
-        chain = flow or getattr(self, "default_flow", list(AGENTS.keys()))
+    def run_all(self, run_id: str, flow: Optional[list] = None, start_after: Optional[str] = None) -> Dict[str, Any]:
+        """Run the agent chain, marking the run failed instead of leaving it dangling.
+
+        ``start_after`` skips every agent up to and including the named one —
+        used to resume a run from where it previously failed.
+        """
+        chain = list(flow or self.default_flow)
+        if start_after is not None:
+            if start_after not in chain:
+                raise AgentError(f"Agent not in flow: {start_after}")
+            chain = chain[chain.index(start_after) + 1:]
+
         summary: Dict[str, Any] = {}
         for agent_id in chain:
-            result = self.run_step(run_id, agent_id)
-            summary[agent_id] = result
+            try:
+                summary[agent_id] = self.run_step(run_id, agent_id)
+            except Exception as exc:
+                self.engine.fail_run(run_id, agent_id, str(exc))
+                summary[agent_id] = {"error": str(exc)}
+                summary["_failed_at"] = agent_id
+                return summary
         self.engine.complete_run(run_id)
         return summary
+
+    def resume(self, run_id: str, agent_id: str) -> Dict[str, Any]:
+        """Resume a failed run: re-run the failing agent, then the rest of the flow."""
+        self.engine.resume_run(run_id, agent_id)
+        if agent_id not in self.default_flow:
+            raise AgentError(f"Agent not in flow: {agent_id}")
+        remaining = self.default_flow[self.default_flow.index(agent_id):]
+        return self.run_all(run_id, flow=remaining)
 
 
 # ---------------------------------------------------------------------------

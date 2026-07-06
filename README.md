@@ -18,14 +18,23 @@ A small Python framework for a freelance AI agent swarm: **find -> profile -> wi
 
 ## Quick start
 
-From `/home/dc-mina/Desktop/ai-freelance-swarm`:
+From the repository root:
 
-PYTHONPATH=. python3 cli/cli.py workflow start
-PYTHONPATH=. python3 cli/cli.py workflow list-runs
-PYTHONPATH=. python3 cli/cli.py tokens --init-budget
-PYTHONPATH=. python3 cli/cli.py tokens --totals --project run-1
-PYTHONPATH=. python3 cli/cli.py allocate --rules --owner 0.6 --reinvestment 0.25 --reserve 0.15
-PYTHONPATH=. python3 cli/cli.py allocate --history
+    PYTHONPATH=. python3 cli/cli.py workflow start           # create a run
+    PYTHONPATH=. python3 cli/cli.py workflow start --run     # create AND execute the full agent flow
+    PYTHONPATH=. python3 cli/cli.py workflow list-runs
+    PYTHONPATH=. python3 cli/cli.py workflow resume <run_id> <agent_id>   # re-run from the failed agent
+    PYTHONPATH=. python3 cli/cli.py tokens --init-budget
+    PYTHONPATH=. python3 cli/cli.py tokens --totals --project run-1
+    PYTHONPATH=. python3 cli/cli.py allocate --rules --owner 0.6 --reinvestment 0.25 --reserve 0.15
+    PYTHONPATH=. python3 cli/cli.py allocate --report --revenue 1000 --ai-cost 100 --fees 50
+    PYTHONPATH=. python3 cli/cli.py allocate --apply         # allocate latest report using saved rules
+    PYTHONPATH=. python3 cli/cli.py allocate --history
+
+Failure semantics: if any agent in a flow raises, the run is marked
+`failed` at that agent (never left dangling in `running`), downstream
+agents are skipped, and `workflow resume` re-runs the flow from the
+failing agent onward.
 
 ## Smoke tests
 
